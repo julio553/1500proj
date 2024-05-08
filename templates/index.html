@@ -166,7 +166,7 @@ return text;
 }
 
 // Função para exibir mensagens na interface do usuário
-let conversations = {
+let conversations = JSON.parse(localStorage.getItem('conversations')) || {
     '1': { name: 'Conversa 1', messages: [] },
     '2': { name: 'Conversa 2', messages: [] }
 };
@@ -182,7 +182,6 @@ async function switchConversation(conversationId) {
             c.classList.add('active');
         }
     });
-    await loadMessagesFromCSV(conversationId); // Carrega as mensagens do CSV
     displayMessage(conversationId);
 }
 
@@ -202,15 +201,11 @@ function displayMessage(conversationId) {
 
     // Verifica se o conversationId existe dentro do objeto conversations
     if (conversations[conversationId]) {
-        // Itera apenas pelas mensagens que não são nulas ou vazias
-        conversations[conversationId].messages.forEach(async msg => {
-            if (msg.content !== '') { // Verifica se o conteúdo da mensagem não é nulo ou vazio
-                const messageElement = document.createElement('div');
-                const content = await msg.content; // Espera pela resolução da promise
-                messageElement.className = `message ${msg.role}`;
-                messageElement.innerHTML = `<div class="message-content">${content}</div><div class="timestamp">${msg.timestamp}</div>`;
-                messagesContainer.appendChild(messageElement);
-            }
+        conversations[conversationId].messages.forEach(msg => {
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${msg.role}`;
+            messageElement.innerHTML = `<div class="message-content">${msg.content}</div><div class="timestamp">${msg.timestamp}</div>`;
+            messagesContainer.appendChild(messageElement);
         });
 
         messagesContainer.scrollTop = messagesContainer.scrollHeight; // Garante que a visualização role para a última mensagem
@@ -224,10 +219,8 @@ async function addMessageToConversation(content, role, conversationId) {
     const now = new Date();
     const timestamp = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
     conversations[conversationId].messages.push({ content, role, timestamp });
-    if (conversationId === currentConversationId) {
-        displayMessage(conversationId);
-    }
-    await writeMessageToCSV({ conversationId, message: content, role, timestamp });
+    localStorage.setItem('conversations', JSON.stringify(conversations));
+    displayMessage(conversationId);
 }
 
 // Função para obter a hora atual no formato HH:MM AM/PM
@@ -241,32 +234,6 @@ function getTime() {
     return `${hours}:${minutes} ${amPm}`;
 }
 
-async function loadMessagesFromCSV(conversationId) {
-    const messages = await readMessagesFromCSV(conversationId);
-    messages.forEach(msg => {
-        addMessageToConversation(msg.message, msg.role, conversationId);
-    });
-}
-
-export async function writeMessageToCSV(message) {
-    // Envia os dados da mensagem para o servidor usando fetch ou outra biblioteca de requisições HTTP
-    fetch('/write-message', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(message)
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        console.log('Message written successfully');
-    })
-    .catch(error => {
-        console.error('Error writing message:', error);
-    });
-}
 
 // Event listener para enviar mensagem quando o formulário for enviado
 document.getElementById('message-form').addEventListener('submit', async function(event) {
@@ -282,6 +249,10 @@ document.getElementById('message-form').addEventListener('submit', async functio
         }, 1000);
         messageInput.value = '';
     }
+});
+
+window.addEventListener('load', () => {
+    displayMessage(currentConversationId);
 });
 
 for (let id in conversations) {

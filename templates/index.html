@@ -1,0 +1,295 @@
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChatGPT Multi-Conversation</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        margin: 0;
+        height: 100vh;
+        background-color: #f5f5f5;
+    }
+
+    .sidebar {
+        width: 200px;
+        background-color: #fff;
+        overflow-y: auto;
+        border-right: 1px solid #ddd;
+    }
+
+    .chat-container {
+        flex-grow: 1;
+        margin: 20px;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        background-color: #fff;
+    }
+
+    .chat-header {
+        background-color: #0b84ff;
+        color: #fff;
+        padding: 10px;
+        text-align: center;
+        font-weight: bold;
+    }
+
+    .chat-messages {
+        padding: 20px;
+        overflow-y: scroll;
+        max-height: 300px;
+    }
+
+    .message {
+        margin-bottom: 15px;
+    }
+
+    .message.self {
+        text-align: right;
+    }
+
+    .message .message-content {
+        padding: 10px 15px;
+        border-radius: 15px;
+    }
+
+    .message.self .message-content {
+        background-color: #0b84ff;
+        color: #fff;
+    }
+
+    .message.other .message-content {
+        background-color: #f0f0f0;
+        color: #333;
+    }
+
+    .message .timestamp {
+        font-size: 0.8em;
+        color: #999;
+    }
+
+    .message.self .timestamp {
+        text-align: right;
+    }
+
+    .message.other .timestamp {
+        text-align: left;
+    }
+
+    .user-input {
+        padding: 10px;
+        border-top: 1px solid #ddd;
+        background-color: #f9f9f9;
+    }
+
+    .user-input input[type="text"], .user-input input[type="submit"]  {
+        width: 100%;
+        padding: 8px;
+        border: none;
+        border-radius: 5px;
+        margin-right: 10px;
+    }
+
+    .conversation {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+    }
+
+    .conversation:hover {
+        background-color: #f0f0f0;
+    }
+
+    
+    .conversation.active {
+        background-color: #b0e0e6;
+    }
+</style>
+</head>
+<body>
+<div class="sidebar">
+    <!-- Placeholder para conversas -->
+    <div class="conversation">Conversa 1</div>
+    <div class="conversation">Conversa 2</div>
+</div>
+<div class="chat-container">
+    <div class="chat-header">ChatGPT</div>
+    <div class="chat-messages"></div>
+    <div class="user-input">
+        <form id="message-form">
+            <input type="text" id="message" placeholder="Digite sua mensagem...">
+            <input type="submit" value="Enviar">
+        </form>
+    </div>
+</div>
+
+<script type="importmap">
+    {
+      "imports": {
+        "@google/generative-ai": "https://esm.run/@google/generative-ai"
+
+      }
+    }
+    </script>
+  
+<script type="module">
+// Função para enviar mensagem para o ChatGPT e receber uma resposta
+//import { writeMessageToCSV, readMessagesFromCSV } from "./csv-parser.js";
+
+import { GoogleGenerativeAI } from "@google/generative-ai";
+//        ,"./csv-parser.js": "./csv-parser.js" // Importe o arquivo csv-parser.js
+
+async function sendMessage(message) {
+    const API_KEY = "AIzaSyCQaVnnuJajandxoTyPOWqJI01GpzNCg80";
+
+// Access your API key (see "Set up your API key" above)
+    const genAI = new GoogleGenerativeAI(API_KEY);
+
+
+    const model = genAI.getGenerativeModel({ model: "gemini-pro"});
+    console.log("model");
+    console.log(model);
+    const result = await model.generateContent(message);
+    const response = await result.response;
+    console.log(response);
+    const text = response.text();
+    console.log(text);
+    // Retorne a resposta gerada
+return text;
+
+}
+
+// Função para exibir mensagens na interface do usuário
+let conversations = {
+    '1': { name: 'Conversa 1', messages: [] },
+    '2': { name: 'Conversa 2', messages: [] }
+};
+
+let currentConversationId = '1'; // Default conversation
+
+async function switchConversation(conversationId) {
+    currentConversationId = conversationId;
+    conversations[conversationId].messages = [];
+    document.querySelectorAll('.conversation').forEach(c => {
+        c.classList.remove('active');
+        if (c.dataset.id === conversationId) {
+            c.classList.add('active');
+        }
+    });
+    await loadMessagesFromCSV(conversationId); // Carrega as mensagens do CSV
+    displayMessage(conversationId);
+}
+
+function addConversation(name, id) {
+    const conversation = document.createElement('div');
+    conversation.className = 'conversation';
+    conversation.textContent = name;
+    conversation.dataset.id = id;
+    conversation.onclick = () => switchConversation(id);
+    document.querySelector('.sidebar').appendChild(conversation);
+}
+
+
+function displayMessage(conversationId) {
+    const messagesContainer = document.querySelector('.chat-messages');
+    messagesContainer.innerHTML = ''; // Limpa as mensagens existentes no container
+
+    // Verifica se o conversationId existe dentro do objeto conversations
+    if (conversations[conversationId]) {
+        // Itera apenas pelas mensagens que não são nulas ou vazias
+        conversations[conversationId].messages.forEach(async msg => {
+            if (msg.content !== '') { // Verifica se o conteúdo da mensagem não é nulo ou vazio
+                const messageElement = document.createElement('div');
+                const content = await msg.content; // Espera pela resolução da promise
+                messageElement.className = `message ${msg.role}`;
+                messageElement.innerHTML = `<div class="message-content">${content}</div><div class="timestamp">${msg.timestamp}</div>`;
+                messagesContainer.appendChild(messageElement);
+            }
+        });
+
+        messagesContainer.scrollTop = messagesContainer.scrollHeight; // Garante que a visualização role para a última mensagem
+    } else {
+        console.error('Invalid conversation ID:', conversationId); // Loga um erro se o ID da conversa não for encontrado
+        // Opcional: Você pode exibir alguma mensagem de erro na UI, ou tratar de outra forma que se adeque ao seu design
+    }
+}
+
+async function addMessageToConversation(content, role, conversationId) {
+    const now = new Date();
+    const timestamp = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+    conversations[conversationId].messages.push({ content, role, timestamp });
+    if (conversationId === currentConversationId) {
+        displayMessage(conversationId);
+    }
+    await writeMessageToCSV({ conversationId, message: content, role, timestamp });
+}
+
+// Função para obter a hora atual no formato HH:MM AM/PM
+function getTime() {
+    const now = new Date();
+    let hours = now.getHours();
+    let minutes = now.getMinutes();
+    const amPm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12; // Converte horas para o formato 12 horas
+    minutes = minutes < 10 ? '0' + minutes : minutes; // Adiciona um zero à esquerda se os minutos forem menores que 10
+    return `${hours}:${minutes} ${amPm}`;
+}
+
+async function loadMessagesFromCSV(conversationId) {
+    const messages = await readMessagesFromCSV(conversationId);
+    messages.forEach(msg => {
+        addMessageToConversation(msg.message, msg.role, conversationId);
+    });
+}
+
+export async function writeMessageToCSV(message) {
+    // Envia os dados da mensagem para o servidor usando fetch ou outra biblioteca de requisições HTTP
+    fetch('/write-message', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(message)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        console.log('Message written successfully');
+    })
+    .catch(error => {
+        console.error('Error writing message:', error);
+    });
+}
+
+// Event listener para enviar mensagem quando o formulário for enviado
+document.getElementById('message-form').addEventListener('submit', async function(event) {
+    event.preventDefault();
+    const messageInput = document.getElementById('message');
+    const message = messageInput.value.trim();
+    if (message !== '') {
+        await addMessageToConversation(message, 'self', currentConversationId);
+        // Simulate a response for demonstration
+        setTimeout(async () => {
+            var text = await sendMessage(message);
+            await addMessageToConversation(text, 'other', currentConversationId);
+        }, 1000);
+        messageInput.value = '';
+    }
+});
+
+for (let id in conversations) {
+    addConversation(conversations[id].name, id);
+}
+switchConversation(currentConversationId);
+
+
+</script>
+</body>
+</html>
